@@ -12,15 +12,27 @@ async function fetchRequest(url){
     return responseBody;
 }
 
-function printBusStopData(busStopData, busStopName, noOfData){
+async function validatePostcode(postcode) {
+    const url = `https://api.postcodes.io/postcodes/${input}/validate`;
+    const postcodeIsValid = (await fetchRequest(validatePostcode)).result;
+    return postcodeIsValid;
+}
+
+function printBusStopData(busStopData, busStopName, noOfBuses){
     console.log("Departures from: " + busStopName);
     console.log("---------------------------------------------------------------------------------------------");
-    for (let i = 0; i < noOfData; i++) {
+    for (let i = 0; i < noOfBuses; i++) {
         console.log("Line Name: " + busStopData[i].lineName);
         console.log("Minutes to arrive at the Station: " + Math.round(busStopData[i].timeToStation/60));
         console.log("Destination: " + busStopData[i].destinationName);
         console.log("---------------------------------------------------------------------------------------------");
     }
+}
+
+async function journeyPlanner(startingPoint, destination) {
+    let urlJP = `https://api.tfl.gov.uk/Journey/JourneyResults/${startingPoint}/to/${destination}`;
+    const responseJourneyPlan = await fetchRequest(urlJP);
+    console.log(responseJourneyPlan);
 }
 const input = prompt("Enter the post code : ");
 let url = `https://api.postcodes.io/postcodes/${input}/validate`;
@@ -40,9 +52,13 @@ if ((await fetchRequest(url)).result===true){
         let busStopData = await fetchRequest(url);
         let sortedbusStopData = busStopData.sort((a, b)=>a["timeToStation"]-b["timeToStation"]);
 
-        const noOfBusStops = 5;
+        let noOfBuses = 5;
+
         if (sortedbusStopData.length!= 0) {
-            printBusStopData(sortedbusStopData, busStopName, noOfBusStops);
+            if (sortedbusStopData.length<noOfBuses)
+                noOfBuses = sortedbusStopData.length;
+            printBusStopData(sortedbusStopData, busStopName, noOfBuses);
+            //await journeyPlanner(input, busStopId);
         }
         else {
             console.log('There are no buses coming at this stop ' + busStopName);
@@ -55,7 +71,10 @@ if ((await fetchRequest(url)).result===true){
         busStopData = await fetchRequest(url);
         sortedbusStopData = busStopData.sort((a, b)=>a["timeToStation"]-b["timeToStation"]);
         if (busStopData.length!= 0) {
-            printBusStopData(sortedbusStopData, busStopName, noOfBusStops);
+            if (sortedbusStopData.length<noOfBuses)
+                noOfBuses = sortedbusStopData.length;
+            printBusStopData(sortedbusStopData, busStopName, noOfBuses);
+            //await journeyPlanner(input, busStopId);
         }
         else {
             console.log('There are no buses coming at this stop ' + busStopName);
@@ -68,3 +87,17 @@ if ((await fetchRequest(url)).result===true){
 else {
     console.log(`Invalid post code. Please try again.`);
 }
+
+// if (badCase) {
+//     throw error or return or do some default;
+// }
+// do normal case here
+// if (badCase2) {
+//     throw error or return or do some default;
+// }
+// do normal case here
+
+// const postcode = getPostcodeFromUser();
+// const nearbyBusStops = getNearbyBusStops(postcode);
+// const arrivalsData = getArrivalsData(nearbyBusStops);
+
