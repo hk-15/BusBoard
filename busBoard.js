@@ -48,8 +48,13 @@ function printBusStopData(busStopData, noOfBuses){
     }
 }
 
+async function getDisruptions(busStopId) {
+    const url = `https://api.tfl.gov.uk/StopPoint/${busStopId}/Disruption`;
+    return await fetchRequest(url);
+}
+
 async function journeyPlanner(startingPoint, destination) {
-    let urlJP = `//api.tfl.gov.uk/Journey/JourneyResults/${startingPoint}/to/${destination}`;
+    let urlJP = `https://api.tfl.gov.uk/Journey/JourneyResults/${startingPoint}/to/${destination}`;
     try {
         const responseJourneyPlan = await fetchRequest(urlJP);
         let journeySteps = await responseJourneyPlan.journeys[0].legs[0].instruction.steps;
@@ -81,6 +86,10 @@ if (listOfBusStops.stopPoints.length===0){
     for (let i=0; i<noOfNearestStops; i++){
         let busStopId = listOfBusStops.stopPoints[i].naptanId;
         let busStopName = listOfBusStops.stopPoints[i].commonName;
+        const disruptions = await getDisruptions(busStopId);
+        if(disruptions.length != 0) {
+            console.log(disruptions[0].description);
+        }
         let sortedbusStopData = await getArrivalsDataByBusStopID(busStopId);
         let noOfBuses = 5;
         if (sortedbusStopData.length === 0) {
