@@ -1,6 +1,7 @@
 import fetch from 'node-fetch';
 import { config } from 'dotenv';
 import promptSync from 'prompt-sync';
+
 const prompt = promptSync();
 config();
 
@@ -8,14 +9,28 @@ const api_key = process.env.api_key;
 
 async function fetchRequest(url){
     const response = await fetch(url);
-    const responseBody = await response.json();
-    return responseBody;
+    return await response.json();
 }
 
 async function validatePostcode(postcode) {
-    const url = `https://api.postcodes.io/postcodes/${input}/validate`;
-    const postcodeIsValid = (await fetchRequest(validatePostcode)).result;
-    return postcodeIsValid;
+    const url = `https://api.postcodes.io/postcodes/${postcode}/validate`;
+    return (await fetchRequest(url)).result;
+}
+
+async function getLocationByPC(postcode){
+    const url = `https://api.postcodes.io/postcodes/${postcode}`;
+    return (await fetchRequest(url)).result;
+}
+
+async function getBusStopsByLocation(postCodeData){
+    const url = `https://api.tfl.gov.uk/StopPoint/?lat=${postCodeData.latitude}&lon=${postCodeData.longitude}&stopTypes=NaptanPublicBusCoachTram`;
+    return await fetchRequest(url);
+}
+
+async function getArrivalsDataByBusStopID(busStopId){
+    const url = `https://api.tfl.gov.uk/StopPoint/${busStopId}/Arrivals?api_key=${api_key}`
+    let busStopData = await fetchRequest(url);
+    return busStopData.sort((a, b)=>a["timeToStation"]-b["timeToStation"]);
 }
 
 function printBusStopData(busStopData, busStopName, noOfBuses){
@@ -35,59 +50,36 @@ async function journeyPlanner(startingPoint, destination) {
     console.log(responseJourneyPlan);
 }
 const input = prompt("Enter the post code : ");
-let url = `https://api.postcodes.io/postcodes/${input}/validate`;
-if ((await fetchRequest(url)).result===true){
-    url = `https://api.postcodes.io/postcodes/${input}`;
-    const postCodeData = await fetchRequest(url);
-    const lat = postCodeData.result.latitude;
-    const lon = postCodeData.result.longitude;
 
-    url = `https://api.tfl.gov.uk/StopPoint/?lat=${lat}&lon=${lon}&stopTypes=NaptanPublicBusCoachTram`;
-    const nearestStops = await fetchRequest(url);
-    if (nearestStops.stopPoints.length!=0){
-        let busStopId = nearestStops.stopPoints[0].naptanId;
-        let busStopName = nearestStops.stopPoints[0].commonName;
-
-        url = `https://api.tfl.gov.uk/StopPoint/${busStopId}/Arrivals?api_key=${api_key}`
-        let busStopData = await fetchRequest(url);
-        let sortedbusStopData = busStopData.sort((a, b)=>a["timeToStation"]-b["timeToStation"]);
-
-        let noOfBuses = 5;
-
-        if (sortedbusStopData.length!= 0) {
-            if (sortedbusStopData.length<noOfBuses)
-                noOfBuses = sortedbusStopData.length;
-            printBusStopData(sortedbusStopData, busStopName, noOfBuses);
-            //await journeyPlanner(input, busStopId);
-        }
-        else {
-            console.log('There are no buses coming at this stop ' + busStopName);
-        } 
-        
-
-        busStopId = nearestStops.stopPoints[1].naptanId;
-        busStopName = nearestStops.stopPoints[1].commonName;
-
-        busStopData = await fetchRequest(url);
-        sortedbusStopData = busStopData.sort((a, b)=>a["timeToStation"]-b["timeToStation"]);
-        if (busStopData.length!= 0) {
-            if (sortedbusStopData.length<noOfBuses)
-                noOfBuses = sortedbusStopData.length;
-            printBusStopData(sortedbusStopData, busStopName, noOfBuses);
-            //await journeyPlanner(input, busStopId);
-        }
-        else {
-            console.log('There are no buses coming at this stop ' + busStopName);
-        }
-    }
-    else {
-        console.log(`Sorry, there are no bus stops nearby.`);
-    }
-}
-else {
+//let url = `https://api.postcodes.io/postcodes/${input}/validate`;
+if (!(await validatePostcode(input))){
     console.log(`Invalid post code. Please try again.`);
 }
+else {
+    const postCodeData = await getLocationByPC(input);
+    const listOfBusStops = await getBusStopsByLocation(postCodeData);
+    const noOfNearestStops = 2;
 
+    if (listOfBusStops.stopPoints.length===0){
+        console.log(`Sorry, there are no bus stops nearby.`);
+    } else {
+        for (let i=0; i<noOfNearestStops; i++){
+            let busStopId = listOfBusStops.stopPoints[i].naptanId;
+            let busStopName = listOfBusStops.stopPoints[i].commonName;
+            let sortedbusStopData = await getArrivalsDataByBusStopID(busStopId);
+            let noOfBuses = 5;
+            if (sortedbusStopData.length === 0) {
+                console.log('There are no buses coming at this stop ' + busStopName);
+            } else {
+                if (sortedbusStopData.length<noOfBuses)
+                    noOfBuses = sortedbusStopData.length;
+                printBusStopData(sortedbusStopData, busStopName, noOfBuses);
+            }
+
+                //await journeyPlanner(input, busStopId);
+        }
+    }     
+}
 // if (badCase) {
 //     throw error or return or do some default;
 // }
