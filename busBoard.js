@@ -1,15 +1,21 @@
 import fetch from 'node-fetch';
 import { config } from 'dotenv';
 import promptSync from 'prompt-sync';
-
 const prompt = promptSync();
+import winston from 'winston';
 config();
 
 const api_key = process.env.api_key;
 
+const logger = winston.createLogger({
+    level: 'info',
+    format: winston.format.json(),
+    transports: [new winston.transports.File({ filename: 'combined.log' })],
+  });
+
 async function fetchRequest(url){
-    const response = await fetch(url);
-    return await response.json();
+        const response = await fetch(url);
+        return await response.json();
 }
 
 async function validatePostcode(postcode) {
@@ -43,14 +49,19 @@ function printBusStopData(busStopData, noOfBuses){
 }
 
 async function journeyPlanner(startingPoint, destination) {
-    let urlJP = `https://api.tfl.gov.uk/Journey/JourneyResults/${startingPoint}/to/${destination}`;
-    const responseJourneyPlan = await fetchRequest(urlJP);
-    let journeySteps = await responseJourneyPlan.journeys[0].legs[0].instruction.steps;
-    for (let i = 0; i < journeySteps.length; i++) {
-        console.log(`${i+1}: ${journeySteps[i].descriptionHeading} ${journeySteps[i].description}.`);
+    let urlJP = `//api.tfl.gov.uk/Journey/JourneyResults/${startingPoint}/to/${destination}`;
+    try {
+        const responseJourneyPlan = await fetchRequest(urlJP);
+        let journeySteps = await responseJourneyPlan.journeys[0].legs[0].instruction.steps;
+        for (let i = 0; i < journeySteps.length; i++) {
+            console.log(`${i+1}: ${journeySteps[i].descriptionHeading} ${journeySteps[i].description}.`);
+        }
+        console.log(`Total travel time is ${await responseJourneyPlan.journeys[0].duration} minute(s).`);
+        console.log("---------------------------------------------------------------------------------------------");
+    } catch(err){
+        console.log(`journey planner: ${err.message}`);
+        logger.error(`journey planner: ${err.message}`);
     }
-    console.log(`Total travel time is ${await responseJourneyPlan.journeys[0].duration} minute(s).`);
-    console.log("---------------------------------------------------------------------------------------------");
 }
 
 let input = prompt("Enter the post code : ");
