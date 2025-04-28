@@ -33,53 +33,59 @@ async function getArrivalsDataByBusStopID(busStopId){
     return busStopData.sort((a, b)=>a["timeToStation"]-b["timeToStation"]);
 }
 
-function printBusStopData(busStopData, busStopName, noOfBuses){
-    console.log("Departures from: " + busStopName);
-    console.log("---------------------------------------------------------------------------------------------");
+function printBusStopData(busStopData, noOfBuses){
     for (let i = 0; i < noOfBuses; i++) {
-        console.log("Line Name: " + busStopData[i].lineName);
-        console.log("Minutes to arrive at the Station: " + Math.round(busStopData[i].timeToStation/60));
-        console.log("Destination: " + busStopData[i].destinationName);
-        console.log("---------------------------------------------------------------------------------------------");
+    console.log("Line Name: " + busStopData[i].lineName);
+    console.log("Minutes to arrive at the Station: " + Math.round(busStopData[i].timeToStation/60));
+    console.log("Destination: " + busStopData[i].destinationName);
+    console.log("---------------------------------------------------------------------------------------------");
     }
 }
 
 async function journeyPlanner(startingPoint, destination) {
     let urlJP = `https://api.tfl.gov.uk/Journey/JourneyResults/${startingPoint}/to/${destination}`;
     const responseJourneyPlan = await fetchRequest(urlJP);
-    console.log(responseJourneyPlan);
+    let journeySteps = await responseJourneyPlan.journeys[0].legs[0].instruction.steps;
+    for (let i = 0; i < journeySteps.length; i++) {
+        console.log(`${i+1}: ${journeySteps[i].descriptionHeading} ${journeySteps[i].description}.`);
+    }
+    console.log(`Total travel time is ${await responseJourneyPlan.journeys[0].duration} minute(s).`);
+    console.log("---------------------------------------------------------------------------------------------");
 }
-const input = prompt("Enter the post code : ");
 
-//let url = `https://api.postcodes.io/postcodes/${input}/validate`;
-if (!(await validatePostcode(input))){
+let input = prompt("Enter the post code : ");
+
+while (!(await validatePostcode(input))){
     console.log(`Invalid post code. Please try again.`);
+    input = prompt("Enter the post code : ");
 }
-else {
-    const postCodeData = await getLocationByPC(input);
-    const listOfBusStops = await getBusStopsByLocation(postCodeData);
-    const noOfNearestStops = 2;
 
-    if (listOfBusStops.stopPoints.length===0){
-        console.log(`Sorry, there are no bus stops nearby.`);
-    } else {
-        for (let i=0; i<noOfNearestStops; i++){
-            let busStopId = listOfBusStops.stopPoints[i].naptanId;
-            let busStopName = listOfBusStops.stopPoints[i].commonName;
-            let sortedbusStopData = await getArrivalsDataByBusStopID(busStopId);
-            let noOfBuses = 5;
-            if (sortedbusStopData.length === 0) {
-                console.log('There are no buses coming at this stop ' + busStopName);
-            } else {
-                if (sortedbusStopData.length<noOfBuses)
-                    noOfBuses = sortedbusStopData.length;
-                printBusStopData(sortedbusStopData, busStopName, noOfBuses);
-            }
+const postCodeData = await getLocationByPC(input);
+const listOfBusStops = await getBusStopsByLocation(postCodeData);
+const noOfNearestStops = 2;
 
-                //await journeyPlanner(input, busStopId);
+if (listOfBusStops.stopPoints.length===0){
+    console.log(`Sorry, there are no bus stops nearby.`);
+} else {
+    for (let i=0; i<noOfNearestStops; i++){
+        let busStopId = listOfBusStops.stopPoints[i].naptanId;
+        let busStopName = listOfBusStops.stopPoints[i].commonName;
+        let sortedbusStopData = await getArrivalsDataByBusStopID(busStopId);
+        let noOfBuses = 5;
+        if (sortedbusStopData.length === 0) {
+            console.log('There are no buses coming at this stop ' + busStopName);
+        } else {
+            if (sortedbusStopData.length<noOfBuses)
+                noOfBuses = sortedbusStopData.length;
+            console.log("Departures from: " + busStopName);
+            console.log("---------------------------------------------------------------------------------------------");
+            printBusStopData(sortedbusStopData, noOfBuses);
         }
-    }     
-}
+        console.log(`Directions to ${busStopName}:`)
+        await journeyPlanner(input, busStopId);
+    }
+}     
+
 // if (badCase) {
 //     throw error or return or do some default;
 // }
